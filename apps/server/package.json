@@ -11,6 +11,8 @@
     "test": "vitest run",
     "sync:pages": "tsx src/cli/sync-pages.ts",
     "sync:products": "tsx src/cli/sync-products.ts",
+    "sync:pages:prod": "node dist/cli/sync-pages.js",
+    "sync:products:prod": "node dist/cli/sync-products.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
