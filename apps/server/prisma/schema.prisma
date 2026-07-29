@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChatRole {
+  user
+  assistant
+}
+
+enum ActionType {
+  update_account
+  update_billing_address
+  update_shipping_address
+  download_invoice
+}
+
+enum ActionStatus {
+  success
+  failure
+}
+
+enum SitePageSource {
+  wp_page
+  wp_post
+  woo_category
+  woo_shop
+}
+
+model ChatSession {
+  id              String    @id @default(uuid())
+  widgetSessionId String    @unique
+  wpUserId        Int?
+  wpUserEmail     String?
+  wpUserName      String?
+  verified        Boolean   @default(false)
+  tokenExpiresAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastActivityAt  DateTime  @default(now())
+
+  messages  ChatMessage[]
+  auditLogs ActionAuditLog[]
+
+  @@index([wpUserId])
+}
+
+model ChatMessage {
+  id         String      @id @default(uuid())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       ChatRole
+  content    String?
+  toolCalls  Json?
+  toolCallId String?
+  toolName   String?
+  actionCards Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+// searchVector is declared as Unsupported so Prisma tracks the column (avoids
+// drift on `prisma migrate dev`) without trying to manage its type. It is a
+// DB-generated `tsvector` column — the GENERATED ALWAYS AS (...) STORED
+// expression and its GIN index are hand-added SQL in the migration (Prisma's
+// schema DSL cannot express either). Never written from the client; all
+// full-text queries go through prisma.$queryRaw.
+model SitePage {
+  id           String                    @id @default(uuid())
+  url          String                    @unique
+  title        String
+  excerpt      String?
+  content      String
+  source       SitePageSource            @default(wp_page)
+  searchVector Unsupported("tsvector")?
+  updatedAt    DateTime                  @updatedAt
+  syncedAt     DateTime                  @default(now())
+}
+
+model ProductCache {
+  id               String   @id @default(uuid())
+  wooProductId     Int      @unique
+  name             String
+  slug             String
+  sku              String?
+  description      String?
+  shortDescription String?
+  price            Decimal  @db.Decimal(10, 2)
+  regularPrice     Decimal? @db.Decimal(10, 2)
+  salePrice        Decimal? @db.Decimal(10, 2)
+  currency         String   @default("EUR")
+  category         String
+  categories       Json
+  attributes       Json
+  stockStatus      String
+  permalink        String
+  imageUrl         String?
+  searchVector     Unsupported("tsvector")?
+  updatedAt        DateTime @updatedAt
+  syncedAt         DateTime @default(now())
+
+  @@index([category])
+  @@index([price])
+}
+
+model ActionAuditLog {
+  id         String       @id @default(uuid())
+  sessionId  String
+  session    ChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  wpUserId   Int?
+  actionType ActionType
+  payload    Json
+  result     Json?
+  status     ActionStatus
+  createdAt  DateTime     @default(now())
+
+  @@index([sessionId, createdAt])
+  @@index([wpUserId])
+}

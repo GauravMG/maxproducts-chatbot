@@ -1,0 +1,370 @@
+:host,
+.mpe-root {
+  all: initial;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1a1a1a;
+}
+
+.mpe-root * {
+  box-sizing: border-box;
+}
+
+.mpe-launcher {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #d3242a;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 2147483000;
+  font-size: 26px;
+  transition: transform 0.15s ease;
+}
+.mpe-launcher:hover {
+  transform: scale(1.05);
+}
+
+.mpe-panel {
+  position: fixed;
+  bottom: 96px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  height: 600px;
+  max-height: calc(100vh - 140px);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 2147483000;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.mpe-header {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.mpe-header-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.mpe-header-subtitle {
+  font-size: 12px;
+  color: #bbb;
+  margin-top: 2px;
+}
+.mpe-close-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+
+.mpe-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f7f7f8;
+}
+
+.mpe-bubble-row {
+  display: flex;
+}
+.mpe-bubble-row.user {
+  justify-content: flex-end;
+}
+.mpe-bubble {
+  max-width: 85%;
+  padding: 10px 13px;
+  border-radius: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mpe-bubble.assistant {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-bottom-left-radius: 4px;
+}
+.mpe-bubble.user {
+  background: #d3242a;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.mpe-bubble a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.mpe-typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+.mpe-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #999;
+  animation: mpe-blink 1.2s infinite ease-in-out;
+}
+.mpe-typing span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.mpe-typing span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes mpe-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.mpe-tool-hint {
+  font-size: 11px;
+  color: #888;
+  padding: 0 4px;
+}
+
+.mpe-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px;
+  max-width: 85%;
+}
+.mpe-card-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.mpe-card-img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #eee;
+}
+.mpe-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #444;
+  margin-top: 2px;
+}
+.mpe-card-row > span:last-child {
+  white-space: nowrap;
+}
+.mpe-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.mpe-btn {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.mpe-btn:hover {
+  background: #333;
+}
+.mpe-btn.secondary {
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #ccc;
+}
+.mpe-btn.secondary:hover {
+  background: #f0f0f0;
+}
+
+.mpe-address-block {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.mpe-input-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #e5e5e5;
+  background: #fff;
+}
+.mpe-input {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 10px 14px;
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+.mpe-input:focus {
+  border-color: #d3242a;
+}
+.mpe-send-btn {
+  background: #d3242a;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.mpe-send-btn:disabled {
+  background: #e2a4a6;
+  cursor: not-allowed;
+}
+
+.mpe-error-banner {
+  background: #fdecea;
+  color: #92140c;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f5c6c3;
+}
+
+.mpe-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: #fdecea;
+  border-bottom: 1px solid #f5c6c3;
+  font-size: 12px;
+  font-weight: 600;
+  color: #92140c;
+}
+.mpe-mode-bar-back {
+  background: transparent;
+  border: none;
+  color: #92140c;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+}
+
+.mpe-menu {
+  margin-top: 4px;
+}
+.mpe-menu-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+.mpe-menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mpe-menu-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.mpe-menu-option:hover {
+  border-color: #d3242a;
+  background: #fff7f7;
+}
+.mpe-menu-option-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.mpe-menu-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mpe-menu-option-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+.mpe-menu-option-desc {
+  font-size: 11px;
+  color: #777;
+}
+
+.mpe-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+  width: 100%;
+}
+.mpe-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.mpe-list-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.mpe-list-item-info {
+  min-width: 0;
+}
+.mpe-list-item-name {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mpe-list-item-meta {
+  font-size: 11px;
+  color: #777;
+  margin-top: 2px;
+}
+.mpe-list-item-btn {
+  flex-shrink: 0;
+}

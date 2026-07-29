@@ -1,0 +1,22 @@
+{
+  "name": "mpe-chatbot",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @mpe-chatbot/shared build && pnpm --parallel --filter ./apps/* dev",
+    "build": "pnpm --filter @mpe-chatbot/shared build && pnpm --filter ./apps/* build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "sync:pages": "pnpm --filter @mpe-chatbot/server sync:pages",
+    "sync:products": "pnpm --filter @mpe-chatbot/server sync:products",
+    "prisma:generate": "pnpm --filter @mpe-chatbot/server exec prisma generate",
+    "prisma:migrate": "pnpm --filter @mpe-chatbot/server exec prisma migrate dev",
+    "prisma:deploy": "pnpm --filter @mpe-chatbot/server exec prisma migrate deploy",
+    "prisma:seed": "pnpm --filter @mpe-chatbot/server exec prisma db seed",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
+  }
+}
