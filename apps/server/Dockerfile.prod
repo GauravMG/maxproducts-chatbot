@@ -1,0 +1,51 @@
+# Production image: builds shared + server + the embeddable widget bundle all inside
+# the image (no host-side pnpm/Node needed, no dev bind-mounts), compiles the server
+# with tsc instead of running tsx watch, and serves the widget bundle from within the
+# same container at GET /widget/mpe-chatbot-widget.js — see src/app.ts.
+FROM node:22-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/package.json
+COPY apps/server/package.json apps/server/package.json
+COPY apps/widget/package.json apps/widget/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages/shared packages/shared
+COPY apps/server apps/server
+COPY apps/widget apps/widget
+
+RUN pnpm --filter @mpe-chatbot/shared build
+RUN pnpm --filter @mpe-chatbot/server exec prisma generate
+RUN pnpm --filter @mpe-chatbot/server build
+RUN pnpm --filter @mpe-chatbot/widget build
+
+# --- runtime image: only what's needed to run, not the whole build toolchain ---
+FROM node:22-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json packages/shared/package.json
+COPY apps/server/package.json apps/server/package.json
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=build /app/packages/shared/dist packages/shared/dist
+COPY --from=build /app/apps/server/dist apps/server/dist
+COPY --from=build /app/apps/server/prisma apps/server/prisma
+COPY --from=build /app/apps/widget/dist apps/widget/dist
+
+# The generated Prisma Client lives inside pnpm's virtual store, not at a stable path
+# that's safe to copy across build stages — regenerate it directly against this
+# stage's own node_modules layout instead (schema is already in place above).
+RUN pnpm --filter @mpe-chatbot/server exec prisma generate
+
+WORKDIR /app/apps/server
+EXPOSE 4000
+
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node dist/index.js"]

@@ -37,6 +37,9 @@ importers:
       pdfkit:
         specifier: ^0.15.1
         version: 0.15.2
+      prisma:
+        specifier: ^5.20.0
+        version: 5.22.0
       uuid:
         specifier: ^10.0.0
         version: 10.0.0
@@ -65,9 +68,6 @@ importers:
       '@types/uuid':
         specifier: ^10.0.0
         version: 10.0.0
-      prisma:
-        specifier: ^5.20.0
-        version: 5.22.0
       tsx:
         specifier: ^4.19.1
         version: 4.23.1

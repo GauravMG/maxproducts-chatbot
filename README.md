@@ -185,6 +185,27 @@ token implementation (`wp-plugin/mpe-chatbot/includes/class-mpe-auth.php`) and t
 other's output (no PHP install needed for this — see the `php:8.2-cli` Docker approach if you want
 to re-check it after modifying either implementation).
 
+## Production deployment
+
+`docker-compose.prod.yml` + `apps/server/Dockerfile.prod` are a self-contained production
+setup: the widget bundle and compiled server are built inside the image (no host Node/pnpm
+needed, no dev bind-mounts), and only `postgres`/`server` run (no `adminer`, no `widget-dev`).
+
+```bash
+git clone <this repo> /path/to/deploy && cd /path/to/deploy
+cp .env.example .env   # fill in real OPENAI_API_KEY, WP_MODE=live + WC keys, a strong
+                        # POSTGRES_PASSWORD, CORS_ALLOWED_ORIGINS=<your WP site>,
+                        # ENABLE_DEV_AUTH=false, and SERVER_HOST_PORT if 4001 is taken
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec server pnpm sync:pages
+docker compose -f docker-compose.prod.yml exec server pnpm sync:products
+```
+
+`server` is published to `127.0.0.1:${SERVER_HOST_PORT}` only — put a real reverse proxy
+(e.g. nginx, see `deploy/nginx-chatbot.conf` for an SSE-safe example config) in front of it
+on a domain with HTTPS. The widget is embedded on your WordPress site (a different origin),
+so the API **must** be HTTPS or browsers will block the requests.
+
 ## Known limitations
 
 - Single-store scoping only; no multi-tenant support.

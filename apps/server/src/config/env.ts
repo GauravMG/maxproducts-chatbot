@@ -24,7 +24,14 @@ const envSchema = z.object({
     .default("")
     .transform((v) => v.split(",").map((s) => s.trim()).filter(Boolean)),
   TOKEN_TTL_SECONDS: z.coerce.number().int().default(900),
-  ENABLE_DEV_AUTH: z.coerce.boolean().default(false),
+  // NOT z.coerce.boolean() — Boolean("false") is `true` in JS (any non-empty string is
+  // truthy), so that would silently ignore an explicit ENABLE_DEV_AUTH=false and leave
+  // the dev-only mock-login route enabled. Parse the actual string value instead.
+  ENABLE_DEV_AUTH: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((v) => v.toLowerCase() === "true" || v === "1"),
 });
 
 const parsed = envSchema.safeParse(process.env);

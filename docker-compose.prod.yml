@@ -1,0 +1,49 @@
+# Production compose file — a standalone replacement for docker-compose.yml, not an
+# override. Differences from the dev file:
+#   - server built from Dockerfile.prod (compiled JS, widget bundle baked into the
+#     image — no host bind-mounts, no tsx watch)
+#   - no widget-dev service (the built widget is served by `server` itself at
+#     /widget/mpe-chatbot-widget.js)
+#   - no adminer (don't expose a DB admin UI to the internet; use an SSH tunnel to
+#     the postgres port below if you need to inspect the database)
+#   - postgres and server are only published to 127.0.0.1 — nginx (running on the
+#     host, outside Docker) reverse-proxies to 127.0.0.1:${SERVER_HOST_PORT}
+#
+# Usage: docker compose -f docker-compose.prod.yml up -d --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chatbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-chatbot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chatbot} -d ${POSTGRES_DB:-chatbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No host port published — only the `server` container needs to reach this, over
+    # the internal compose network. Add "127.0.0.1:5433:5432" here temporarily (and an
+    # SSH tunnel) if you ever need direct DB access.
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile.prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chatbot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-chatbot}
+    ports:
+      # Bound to localhost only — nginx on the host proxies public traffic in.
+      - "127.0.0.1:${SERVER_HOST_PORT:-4001}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
