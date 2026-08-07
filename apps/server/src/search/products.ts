@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.js";
 import type {
+  Facet,
   ProductDetail,
   ProductFacets,
   ProductSummary,
@@ -124,6 +125,17 @@ async function computeFacets(filters: SearchProductsInput): Promise<ProductFacet
         ? { min: priceRows[0].min, max: priceRows[0].max as number }
         : null,
   };
+}
+
+/** The full category list, unfiltered — used by the website_info mode's list_categories
+ * tool so "what categories do you have?" is answered from real catalog data instead of
+ * the model guessing from general/training knowledge. */
+export async function listCategories(): Promise<Facet[]> {
+  const rows = await prisma.$queryRaw<{ category: string; count: bigint }[]>`
+    SELECT "category", count(*)::bigint AS count FROM "ProductCache"
+    GROUP BY "category" ORDER BY count DESC
+  `;
+  return rows.map((r) => ({ name: r.category, count: Number(r.count) }));
 }
 
 const SUGGESTION_LIMIT = 5;

@@ -36,6 +36,44 @@ describe("searchPages", () => {
     expect(stillWorks.length).toBeGreaterThan(0);
   });
 
+  it("finds a page via loose OR fallback when the phrasing mixes generic words with a real topic", async () => {
+    // Strict AND-matching every word (including "tell me about your") fails since those
+    // words don't appear in the actual page content — the loose OR fallback should still
+    // find the return-policy page from the real topic words alone.
+    const results = await searchPages("tell me about your return policy");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.some((r) => /return/i.test(r.title))).toBe(true);
+  });
+
+  it("returns a contentSnippet pulled from the page body, not just the short excerpt", async () => {
+    const results = await searchPages("returns policy", 1);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].contentSnippet).toBeTruthy();
+  });
+
+  it("omitting query returns the most recently updated content instead of searching for nothing", async () => {
+    const count = await prisma.sitePage.count();
+    if (count === 0) return;
+
+    const results = await searchPages(undefined, 5);
+    expect(results.length).toBeGreaterThan(0);
+    // Every result should carry no relevance score (nothing was actually searched for).
+    expect(results.every((r) => r.score === undefined)).toBe(true);
+
+    const dates = await Promise.all(
+      results.map(async (r) => (await prisma.sitePage.findUnique({ where: { url: r.url } }))!.updatedAt.getTime())
+    );
+    expect([...dates]).toEqual([...dates].sort((a, b) => b - a));
+  });
+
+  it("omitting query still respects sourceFilter", async () => {
+    const results = await searchPages(undefined, 20, "blogs");
+    for (const r of results) {
+      const row = await prisma.sitePage.findUnique({ where: { url: r.url } });
+      expect(row?.source).toBe("wp_post");
+    }
+  });
+
   it("sourceFilter restricts results to their own slice of content (blogs vs website info)", async () => {
     // Broad, generic query so we get whatever's available across both slices, then
     // confirm each filtered call only ever returns its own source.

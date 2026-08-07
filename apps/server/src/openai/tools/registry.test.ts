@@ -4,6 +4,7 @@ import { getAllTools, getTool, toOpenAITools } from "./registry.js";
 
 const EXPECTED_TOOL_NAMES = [
   "search_pages",
+  "list_categories",
   "search_products",
   "get_product_details",
   "get_account_details",

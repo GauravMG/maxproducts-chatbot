@@ -1,17 +1,18 @@
 import {
+  emptyInput,
   getProductDetailsInput,
   searchPagesInput,
   searchProductsInput,
   type ActionButton,
 } from "@mpe-chatbot/shared";
 import { searchPages } from "../../search/pages.js";
-import { getProductDetails, searchProducts } from "../../search/products.js";
+import { getProductDetails, listCategories, searchProducts } from "../../search/products.js";
 import { registerTool } from "./registry.js";
 
 registerTool({
   name: "search_pages",
   description:
-    "Search the website's informational pages/content (About, Contact, shipping & returns, blog posts, category descriptions) to answer questions about the site or company. Always use this instead of guessing when asked about site content, policies, or company info.",
+    "Search the website's informational pages/content (About, Contact, shipping & returns, blog posts, category descriptions) to answer questions about the site or company. Always use this instead of guessing when asked about site content, policies, or company info. Omit `query` entirely when the user has no specific topic (e.g. \"show me recent blog posts\", \"what's new\") — this returns the most recently updated content instead of searching for nothing, which would just fail. Each result's `contentSnippet` is pulled from the page's actual body content (not the short `excerpt`) — trust it as the source of specific facts (an email address, a policy detail, a link), since the short excerpt is just marketing copy and often won't contain them.",
   requiresAuth: false,
   schema: searchPagesInput,
   handler: async (input, ctx) => {
@@ -20,6 +21,18 @@ registerTool({
     const sourceFilter = ctx.mode === "blogs" ? "blogs" : ctx.mode === "website_info" ? "pages" : undefined;
     const results = await searchPages(input.query, input.limit ?? 5, sourceFilter);
     return { data: { results } };
+  },
+});
+
+registerTool({
+  name: "list_categories",
+  description:
+    "List the real product categories that exist in the catalog, with how many products are in each. Use this for questions about what categories/types of products are available — never answer from general knowledge or guess a category list, always ground it in this data.",
+  requiresAuth: false,
+  schema: emptyInput,
+  handler: async () => {
+    const categories = await listCategories();
+    return { data: { categories } };
   },
 });
 

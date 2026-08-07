@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProductDetails, searchProducts } from "./products.js";
+import { getProductDetails, listCategories, searchProducts } from "./products.js";
 
 // These run against the real Postgres instance (see docker-compose.yml), pre-seeded via
 // `pnpm sync:products`. They exercise the actual tsvector/GIN full-text search and JSONB
@@ -141,5 +141,16 @@ describe("getProductDetails", () => {
     if (!anyProduct?.sku) return;
     const detail = await getProductDetails({ sku: anyProduct.sku });
     expect(detail?.id).toBe(anyProduct.id);
+  });
+});
+
+describe("listCategories", () => {
+  it("returns real categories with counts, matching what search_products' facets report", async () => {
+    const categories = await listCategories();
+    expect(categories.length).toBeGreaterThan(0);
+    expect(categories.every((c) => c.count > 0)).toBe(true);
+
+    const known = (await searchProducts({ category: categories[0].name })).total;
+    expect(known).toBe(categories[0].count);
   });
 });

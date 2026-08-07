@@ -5,7 +5,12 @@ import { z } from "zod";
 // them to validate model-generated arguments before executing anything.
 
 export const searchPagesInput = z.object({
-  query: z.string().min(1).describe("Natural-language search query about site content/pages"),
+  query: z
+    .string()
+    .optional()
+    .describe(
+      "Natural-language search topic about site content/pages. Omit entirely when the user has no specific topic — e.g. \"show me recent blog posts\", \"what's new\" — this returns the most recently updated content instead of searching for nothing."
+    ),
   limit: z.number().int().min(1).max(10).optional().describe("Max results, default 5"),
 });
 

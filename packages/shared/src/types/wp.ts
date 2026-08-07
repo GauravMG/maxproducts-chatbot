@@ -53,6 +53,11 @@ export interface SitePageSummary {
   url: string;
   title: string;
   excerpt: string;
+  /** A snippet pulled from the page's actual body content (not just the short WP
+   * auto-excerpt) — for a topic search, centered on the matched terms so facts buried
+   * deep in a long page (an email address, a policy detail) are visible to the model.
+   * Absent for the "no topic given, most recent items" fallback (nothing to center on). */
+  contentSnippet?: string;
   score?: number;
 }
 

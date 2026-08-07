@@ -17,6 +17,17 @@ const HTML_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: " ",
+  hellip: "…",
+  mdash: "—",
+  ndash: "–",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  middot: "·",
 };
 
 // WP/WooCommerce REST responses commonly leave titles/category names HTML-entity-encoded
@@ -30,6 +41,19 @@ export function decodeHtmlEntities(text: string): string {
       return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint);
     }
     return HTML_ENTITIES[code.toLowerCase()] ?? match;
+  });
+}
+
+// A blanket tag-strip (see stripAndDecode below) throws away every attribute, including
+// `href` — so a page's actual link targets (e.g. social media icons in a "Follow us"
+// section, which often have no visible text at all) were previously lost entirely, even
+// though the destination URL is exactly what a question like "social media links" needs.
+// Rewriting anchors to "text (href)" (or just the bare href when there's no visible text)
+// before the generic strip keeps that URL in the plain text the search index sees.
+export function preserveLinkHrefs(html: string): string {
+  return html.replace(/<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href: string, inner: string) => {
+    const text = inner.replace(/<[^>]+>/g, "").trim();
+    return text ? `${text} (${href})` : href;
   });
 }
 
@@ -149,8 +173,14 @@ export class LiveWpAdapter implements WpAdapter {
       this.wp.get("/pages", { params: { per_page: 100, status: "publish" } }),
       this.wp.get("/posts", { params: { per_page: 100, status: "publish" } }),
     ]);
+    // <script>/<style> tags need their inner content dropped too, not just the tags
+    // themselves — some pages embed a JS widget (e.g. a custom "recent posts" fetcher),
+    // and the generic tag-strip below only removes markup, leaving raw JS/CSS source
+    // sitting in what's supposed to be plain page text: it pollutes the search index and
+    // can outrank the actual content when ranking a query.
+    const stripScriptsAndStyles = (html: string): string => html.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "");
     const stripAndDecode = (html: string | undefined): string =>
-      decodeHtmlEntities((html ?? "").replace(/<[^>]+>/g, "")).trim();
+      decodeHtmlEntities(preserveLinkHrefs(stripScriptsAndStyles(html ?? "")).replace(/<[^>]+>/g, "")).trim();
     const mapEntry = (entry: any, source: SitePageRecord["source"]): SitePageRecord => ({
       url: entry.link,
       title: stripAndDecode(entry.title?.rendered),

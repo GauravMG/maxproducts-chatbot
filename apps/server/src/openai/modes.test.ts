@@ -14,9 +14,11 @@ describe("getModeToolNames", () => {
     }
   });
 
-  it("website_info and blogs modes only expose search_pages", () => {
-    for (const mode of ["website_info", "blogs"] as const) {
-      expect(getModeToolNames(mode)).toEqual(["search_pages"]);
-    }
+  it("blogs mode only exposes search_pages", () => {
+    expect(getModeToolNames("blogs")).toEqual(["search_pages"]);
+  });
+
+  it("website_info mode exposes search_pages plus list_categories (grounds catalog-structure questions in real data)", () => {
+    expect(getModeToolNames("website_info")).toEqual(["search_pages", "list_categories"]);
   });
 });
