@@ -68,10 +68,35 @@ describe("searchProducts", () => {
     expect(viaSku.items.some((p) => p.id === anyProduct.id)).toBe(true);
   });
 
-  it("returns zero results for a nonsense query without throwing", async () => {
+  it("returns zero results for a nonsense query without throwing, and no suggestions for it", async () => {
     const result = await searchProducts({ query: "zzzznonexistentproductxyz123" });
     expect(result.total).toBe(0);
     expect(result.items).toEqual([]);
+    expect(result.suggestions ?? []).toEqual([]);
+  });
+
+  it("suggests near-name matches for a typo'd query that has no exact match", async () => {
+    const anyProduct = (await searchProducts({ category: "Cordless Power Tools" })).items[0];
+    if (!anyProduct) return;
+    const firstWord = anyProduct.name.split(" ")[0];
+    if (firstWord.length < 4) return; // too short to typo meaningfully
+
+    const mid = Math.floor(firstWord.length / 2);
+    const typoWord = firstWord.slice(0, mid) + firstWord.slice(mid + 1); // drop one character
+
+    const result = await searchProducts({ query: typoWord });
+    if (result.total > 0) return; // typo happened to still match something via full-text; nothing to assert
+
+    expect(result.suggestions?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("suggests the same product when the text matches but a narrowing filter doesn't", async () => {
+    const anyProduct = (await searchProducts({ category: "Cordless Power Tools" })).items[0];
+    if (!anyProduct) return;
+
+    const result = await searchProducts({ query: anyProduct.name, category: "Nonexistent Category ZZZ" });
+    expect(result.total).toBe(0);
+    expect(result.suggestions?.some((p) => p.id === anyProduct.id)).toBe(true);
   });
 
   it("paginates results", async () => {

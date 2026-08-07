@@ -6,11 +6,9 @@ import { MenuOptions } from "./MenuOptions.js";
 
 export function MessageList({
   apiUrl,
-  onViewProductDetails,
   onSelectMenuOption,
 }: {
   apiUrl: string;
-  onViewProductDetails: (productId: number) => void;
   onSelectMenuOption: (option: MenuOption) => void;
 }) {
   const messages = useChatStore((s) => s.messages);
@@ -33,7 +31,7 @@ export function MessageList({
         </div>
       )}
       {messages.map((m) => (
-        <MessageBubble key={m.id} message={m} apiUrl={apiUrl} onViewProductDetails={onViewProductDetails} />
+        <MessageBubble key={m.id} message={m} apiUrl={apiUrl} />
       ))}
       {mode === "menu" && <MenuOptions onSelect={onSelectMenuOption} />}
       {toolHint && <div className="mpe-tool-hint">Looking up {toolHint.replace(/_/g, " ")}...</div>}

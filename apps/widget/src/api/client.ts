@@ -1,4 +1,4 @@
-import type { ChatMessageDTO, ChatMode, StreamEvent } from "@mpe-chatbot/shared";
+import type { ChatMode, StreamEvent } from "@mpe-chatbot/shared";
 
 export interface StreamChatOptions {
   apiUrl: string;
@@ -59,26 +59,6 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
       }
     }
   }
-}
-
-/** Calls the deterministic, non-LLM POST /api/chat/action endpoint — used when the
- * user clicks a specific item in a product_list card. Plain JSON, no streaming, no
- * model round trip: instant and always correct, unlike asking the model to fetch it. */
-export async function fetchProductDetailsAction(
-  apiUrl: string,
-  widgetSessionId: string,
-  productId: number
-): Promise<ChatMessageDTO> {
-  const res = await fetch(`${apiUrl}/api/chat/action`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ widgetSessionId, action: "view_product_details", productId }),
-  });
-  if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
-  }
-  const data = (await res.json()) as { message: ChatMessageDTO };
-  return data.message;
 }
 
 const SESSION_STORAGE_KEY = "mpe_chatbot_session_id";

@@ -216,8 +216,14 @@ so the API **must** be HTTPS or browsers will block the requests.
   catalog this size but won't scale to semantic search over huge unstructured content.
 - Identity tokens are 15 minutes by default (`TOKEN_TTL_SECONDS` / the plugin's Token TTL
   setting) — both sides must agree on the same value.
-- `docker compose` here targets **local development only**; there's no production deployment
-  config (TLS termination, process manager, image hardening) included yet.
-- The widget's product-narrowing quality depends on the model actually following the system
-  prompt's instructions (see `apps/server/src/openai/systemPrompt.ts`) — it's been tuned against
-  real `gpt-4o-mini` behavior during development, but isn't a hard guarantee for every phrasing.
+- Product search results are described by the model in plain conversational text, not a
+  clickable list — deliberately, per product decision (see `apps/server/src/openai/modes.ts`).
+  One case is still enforced server-side rather than left to the model: when a search returns
+  more than 8 matches, the "ask one clarifying question by category/brand" reply is composed
+  in code (`buildFacetClarifyingQuestion` in `orchestrator.ts`), not by the model — direct
+  testing showed `gpt-4o-mini` reliably ignores that instruction on its own and dumps a raw
+  list instead. Everything else (1-8 results, single-match detail, no-match suggestions) is
+  free-form model text using the exact tool data, no deterministic override.
+- No-match product searches fall back to `suggestions` — near-name matches (pg_trgm similarity,
+  tolerates typos) or the same query with a narrowing filter relaxed (see
+  `findSuggestions` in `apps/server/src/search/products.ts`) — instead of a flat dead end.

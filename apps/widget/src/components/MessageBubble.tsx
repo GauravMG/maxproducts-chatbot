@@ -5,14 +5,11 @@ import { ActionCardRenderer } from "./cards/ActionCardRenderer.js";
 export function MessageBubble({
   message,
   apiUrl,
-  onViewProductDetails,
 }: {
   message: ChatMessageView;
   apiUrl: string;
-  onViewProductDetails: (productId: number) => void;
 }) {
-  // Some messages (e.g. the deterministic response to clicking a product_list item)
-  // carry only action cards, no text — skip the empty text bubble entirely for those.
+  // Some messages carry only action cards, no text — skip the empty text bubble for those.
   const showTextBubble = message.content || message.streaming;
 
   return (
@@ -34,7 +31,7 @@ export function MessageBubble({
       )}
       {message.actionCards?.map((card, i) => (
         <div className="mpe-bubble-row assistant" key={i}>
-          <ActionCardRenderer card={card} apiUrl={apiUrl} onViewProductDetails={onViewProductDetails} />
+          <ActionCardRenderer card={card} apiUrl={apiUrl} />
         </div>
       ))}
     </>

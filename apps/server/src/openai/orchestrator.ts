@@ -1,15 +1,49 @@
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
-import type { ActionCard, ChatMessageDTO, ChatMode, ProductSummary, StreamEvent } from "@mpe-chatbot/shared";
+import type { ActionCard, ChatMessageDTO, ChatMode, ProductFacets, StreamEvent } from "@mpe-chatbot/shared";
 import { openai } from "./client.js";
 import { env } from "../config/env.js";
 import { buildSystemPrompt } from "./systemPrompt.js";
-import { getModeToolNames, shouldAttachProductList } from "./modes.js";
+import { getModeToolNames } from "./modes.js";
 import { getTool, toOpenAITools, type ToolContext } from "./tools/index.js";
 import { prisma } from "../db/prisma.js";
 import type { VerifiedWpIdentity } from "../auth/identity.js";
 
 const MAX_TOOL_ROUNDTRIPS = 4;
 const HISTORY_TURNS = 20;
+const PRODUCT_LIST_MAX = 8;
+// Every guided mode that calls search_products.
+const PRODUCT_SEARCH_MODES: readonly ChatMode[] = ["search_products", "product_details", "ecommerce"];
+
+/**
+ * gpt-4o-mini reliably ignores the "more than 8 matches: ask one clarifying question,
+ * don't list them" instruction in modes.ts's RESULT_COUNT_HANDLING — verified by direct
+ * testing, it dumps a raw numbered list of SKUs regardless of the prompt wording. With no
+ * deterministic UI card anymore (removed in favor of fully conversational text, per
+ * product decision), that overwhelming dump is now the entire user-facing result, so this
+ * one case is composed server-side instead of trusted to the model — still plain
+ * conversational text, just reliably correct instead of a coin flip.
+ */
+function buildFacetClarifyingQuestion(
+  total: number,
+  facets: ProductFacets,
+  applied: { categoryAlreadySet: boolean; brandAlreadySet: boolean }
+): string {
+  // computeFacets always returns the full category/brand breakdown regardless of which
+  // filters are already applied (so switching filters is possible) — but that means it's
+  // not safe to just take facets.categories at face value: if the user already picked a
+  // category, re-offering the full category list (including ones they just excluded)
+  // reads as if their choice was ignored. Only offer a dimension that isn't already fixed.
+  const categoryOption = !applied.categoryAlreadySet && facets.categories.length ? facets.categories.slice(0, 4) : null;
+  const brandOption = !applied.brandAlreadySet && facets.brands.length ? facets.brands.slice(0, 4) : null;
+  const source = categoryOption ?? brandOption;
+
+  if (!source) {
+    return `I found ${total} matches — that's still a lot to show at once. Can you tell me a bit more about what you're looking for — a specific name, feature, or price range?`;
+  }
+  const label = categoryOption ? "category" : "brand";
+  const breakdown = source.map((f) => `${f.name} (${f.count})`).join(", ");
+  return `I found ${total} matches — want to narrow it down by ${label}? ${breakdown}. Or just tell me more specifically what you're looking for.`;
+}
 
 interface RunTurnParams {
   sessionId: string;
@@ -122,17 +156,44 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
       })),
     });
 
+    let overwhelmingResultText: string | null = null;
+
     for (const tc of toolCalls) {
       yield { type: "tool_call_start", toolName: tc.name, toolCallId: tc.id };
 
       const { resultPayload, ok } = await executeTool(tc, toolContext, wpIdentity, collectedActionCards);
 
-      if (ok && tc.name === "search_products") {
-        attachProductListIfNeeded(resultPayload, mode, collectedActionCards);
-      }
-
       yield { type: "tool_call_result", toolCallId: tc.id, toolName: tc.name, ok };
       messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(resultPayload) });
+
+      if (
+        ok &&
+        tc.name === "search_products" &&
+        !overwhelmingResultText &&
+        PRODUCT_SEARCH_MODES.includes(mode) &&
+        typeof resultPayload === "object" &&
+        resultPayload !== null
+      ) {
+        const result = resultPayload as { total?: unknown; facets?: ProductFacets };
+        if (typeof result.total === "number" && result.total > PRODUCT_LIST_MAX && result.facets) {
+          let appliedArgs: { category?: unknown; brand?: unknown } = {};
+          try {
+            appliedArgs = JSON.parse(tc.args || "{}");
+          } catch {
+            // malformed args JSON — treat as no filters known, still safe to ask generically
+          }
+          overwhelmingResultText = buildFacetClarifyingQuestion(result.total, result.facets, {
+            categoryAlreadySet: Boolean(appliedArgs.category),
+            brandAlreadySet: Boolean(appliedArgs.brand),
+          });
+        }
+      }
+    }
+
+    if (overwhelmingResultText) {
+      yield { type: "token", delta: overwhelmingResultText };
+      finalContent = overwhelmingResultText;
+      break;
     }
   }
 
@@ -160,22 +221,6 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
 
   yield { type: "message_complete", message: messageDto };
   yield { type: "done" };
-}
-
-/**
- * Deterministically decides — from the actual result count and active mode, never from
- * what the model says — whether to attach a clickable product_list card. This is the
- * mechanism that guarantees a narrowed search always surfaces a pickable list in the
- * UI, regardless of whether the model's text response gets it right.
- */
-function attachProductListIfNeeded(resultPayload: unknown, mode: ChatMode, collectedActionCards: ActionCard[]): void {
-  if (typeof resultPayload !== "object" || resultPayload === null) return;
-  const result = resultPayload as { total?: unknown; items?: unknown };
-  if (typeof result.total !== "number" || !Array.isArray(result.items)) return;
-
-  if (shouldAttachProductList(mode, result.total)) {
-    collectedActionCards.push({ type: "product_list", products: result.items as ProductSummary[] });
-  }
 }
 
 async function executeTool(

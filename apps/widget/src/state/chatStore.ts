@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ActionCard, ChatMessageDTO, ChatMode } from "@mpe-chatbot/shared";
+import type { ActionCard, ChatMode } from "@mpe-chatbot/shared";
 
 export interface ChatMessageView {
   id: string;
@@ -31,9 +31,6 @@ interface ChatState {
   setToolHint: (hint: string | null) => void;
   attachActionCards: (id: string, cards: ActionCard[]) => void;
   finalizeAssistantMessage: (id: string, content: string | null, actionCards?: ActionCard[]) => void;
-  /** Injects a message received outside the normal streaming flow — e.g. the
-   * deterministic, non-LLM response from clicking an item in a product_list card. */
-  appendMessage: (message: ChatMessageDTO) => void;
   setSending: (sending: boolean) => void;
   setError: (error: string | null) => void;
   resetConversation: () => void;
@@ -84,20 +81,6 @@ export const useChatStore = create<ChatState>((set) => ({
           : m
       ),
       toolHint: null,
-    })),
-
-  appendMessage: (message) =>
-    set((s) => ({
-      messages: [
-        ...s.messages,
-        {
-          id: message.id,
-          role: message.role,
-          content: message.content ?? "",
-          actionCards: message.actionCards,
-          streaming: false,
-        },
-      ],
     })),
 
   setSending: (sending) => set({ sending }),

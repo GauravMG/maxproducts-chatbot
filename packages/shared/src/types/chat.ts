@@ -24,11 +24,7 @@ export type ActionCard =
       address: Address;
     }
   | { type: "action_buttons"; buttons: ActionButton[] }
-  | { type: "login_prompt"; loginUrl: string; message: string }
-  // A narrowed batch of search results the user can pick from — attached deterministically
-  // by the server (not left to the model) whenever a product search yields a manageable,
-  // pickable set. Clicking an item calls a plain, non-LLM endpoint (see ChatActionRequest).
-  | { type: "product_list"; products: ProductSummary[] };
+  | { type: "login_prompt"; loginUrl: string; message: string };
 
 /**
  * Declares intent up front so the server can restrict which tools the model is even
@@ -70,14 +66,4 @@ export interface ChatStreamRequest {
   mode?: ChatMode;
   pageUrl?: string;
   pageTitle?: string;
-}
-
-/** Deterministic, non-LLM action — e.g. clicking a specific item in a product_list card.
- * Handled by POST /api/chat/action: a plain JSON request/response, no streaming, no
- * model involved, so it's instant and 100% reliable regardless of what the model would
- * have done. Currently only one action type exists; the shape leaves room for more. */
-export interface ChatActionRequest {
-  widgetSessionId: string;
-  action: "view_product_details";
-  productId: number;
 }

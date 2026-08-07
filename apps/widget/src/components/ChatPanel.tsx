@@ -11,7 +11,6 @@ export function ChatPanel({
   onSend,
   onClose,
   onNewChat,
-  onViewProductDetails,
   onSelectMenuOption,
 }: {
   apiUrl: string;
@@ -20,7 +19,6 @@ export function ChatPanel({
   onSend: (text: string) => void;
   onClose: () => void;
   onNewChat: () => void;
-  onViewProductDetails: (productId: number) => void;
   onSelectMenuOption: (option: MenuOption) => void;
 }) {
   const mode = useChatStore((s) => s.mode);
@@ -55,7 +53,7 @@ export function ChatPanel({
           </button>
         </div>
       )}
-      <MessageList apiUrl={apiUrl} onViewProductDetails={onViewProductDetails} onSelectMenuOption={onSelectMenuOption} />
+      <MessageList apiUrl={apiUrl} onSelectMenuOption={onSelectMenuOption} />
       <InputBar sending={sending} onSend={onSend} placeholder={activeOption?.placeholder} />
     </div>
   );

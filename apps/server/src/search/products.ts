@@ -126,9 +126,57 @@ async function computeFacets(filters: SearchProductsInput): Promise<ProductFacet
   };
 }
 
+const SUGGESTION_LIMIT = 5;
+// similarity() is 0..1 (1 = identical); this is low enough to survive a couple of
+// typo'd characters in a short product name but still rejects genuinely unrelated names.
+const TRIGRAM_THRESHOLD = 0.15;
+
+/**
+ * Called only when the strict search above found nothing, to answer "what did you
+ * probably mean, or what do we have that's close?" (client feedback: suggest similar
+ * items instead of a dead end, and tolerate typos). Two tiers, cheapest/most-precise first:
+ *  1. The filters themselves were too narrow (e.g. right product, wrong brand/category/
+ *     price band) — retry with only the text conditions (query/sku), dropping the rest.
+ *  2. The text itself doesn't literally match anything (typo, or we just don't carry it) —
+ *     fall back to trigram name similarity, which tolerates misspellings.
+ * Either tier returns early once it finds something; no point running the fuzzier,
+ * less-precise tier if the precise one already found real matches.
+ */
+async function findSuggestions(filters: SearchProductsInput): Promise<ProductSummary[]> {
+  const textOnlyConditions = [
+    ...(filters.query
+      ? [Prisma.sql`"searchVector" @@ websearch_to_tsquery('english', ${filters.query})`]
+      : []),
+    ...(filters.sku ? [Prisma.sql`"sku" ILIKE ${`%${filters.sku}%`}`] : []),
+  ];
+  const hadNarrowingFilters =
+    filters.category || filters.brand || filters.minPrice !== undefined || filters.maxPrice !== undefined || filters.attributes;
+
+  if (textOnlyConditions.length > 0 && hadNarrowingFilters) {
+    const rows = await prisma.$queryRaw<ProductRow[]>`
+      SELECT ${PRODUCT_COLUMNS} FROM "ProductCache"
+      WHERE ${whereClause(textOnlyConditions)}
+      ORDER BY "updatedAt" DESC
+      LIMIT ${SUGGESTION_LIMIT}
+    `;
+    if (rows.length > 0) return rows.map(mapRow);
+  }
+
+  const fuzzyText = filters.query || filters.sku;
+  if (!fuzzyText) return [];
+
+  const rows = await prisma.$queryRaw<ProductRow[]>`
+    SELECT ${PRODUCT_COLUMNS} FROM "ProductCache"
+    WHERE similarity("name", ${fuzzyText}) > ${TRIGRAM_THRESHOLD}
+    ORDER BY similarity("name", ${fuzzyText}) DESC
+    LIMIT ${SUGGESTION_LIMIT}
+  `;
+  return rows.map(mapRow);
+}
+
 export async function searchProducts(
   filters: SearchProductsInput
-): Promise<{ total: number; items: ProductSummary[]; facets: ProductFacets }> {
+): Promise<{ total: number; items: ProductSummary[]; facets: ProductFacets; suggestions?: ProductSummary[] }> {
   const page = filters.page ?? 1;
   const where = whereClause(buildConditions(filters));
 
@@ -136,6 +184,12 @@ export async function searchProducts(
     SELECT count(*)::bigint AS count FROM "ProductCache" WHERE ${where}
   `;
   const total = Number(countRows[0]?.count ?? 0);
+
+  if (total === 0) {
+    const facets = await computeFacets(filters);
+    const suggestions = await findSuggestions(filters);
+    return { total: 0, items: [], facets, suggestions: suggestions.length ? suggestions : undefined };
+  }
 
   const itemRows = await prisma.$queryRaw<ProductRow[]>`
     SELECT ${PRODUCT_COLUMNS} FROM "ProductCache"

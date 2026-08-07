@@ -4,17 +4,8 @@ import { OrderCard } from "./OrderCard.js";
 import { AddressCard } from "./AddressCard.js";
 import { ActionButtonsCard } from "./ActionButtonsCard.js";
 import { LoginPromptCard } from "./LoginPromptCard.js";
-import { ProductListCard } from "./ProductListCard.js";
 
-export function ActionCardRenderer({
-  card,
-  apiUrl,
-  onViewProductDetails,
-}: {
-  card: ActionCard;
-  apiUrl: string;
-  onViewProductDetails: (productId: number) => void;
-}) {
+export function ActionCardRenderer({ card, apiUrl }: { card: ActionCard; apiUrl: string }) {
   switch (card.type) {
     case "product":
       return <ProductCard card={card} apiUrl={apiUrl} />;
@@ -26,8 +17,6 @@ export function ActionCardRenderer({
       return <ActionButtonsCard card={card} apiUrl={apiUrl} />;
     case "login_prompt":
       return <LoginPromptCard card={card} />;
-    case "product_list":
-      return <ProductListCard card={card} onViewDetails={onViewProductDetails} />;
     default:
       return null;
   }
