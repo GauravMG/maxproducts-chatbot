@@ -10,18 +10,30 @@ import type { VerifiedWpIdentity } from "../auth/identity.js";
 
 const MAX_TOOL_ROUNDTRIPS = 4;
 const HISTORY_TURNS = 20;
-const PRODUCT_LIST_MAX = 8;
+// Threshold for asking a clarifying question instead of just answering. There's no card/grid
+// anymore to justify a tight limit — this is plain text, so it only needs to guard against a
+// genuinely overwhelming dump (100+ raw items), not a merely long one (a natural list of
+// 15-20 is fine reading in a chat).
+const FACET_ASK_THRESHOLD = 20;
 // Every guided mode that calls search_products.
 const PRODUCT_SEARCH_MODES: readonly ChatMode[] = ["search_products", "product_details", "ecommerce"];
+// Marks an assistant ChatMessage as the deterministic facet-clarifying override below, so
+// the NEXT turn can tell it already asked once and must not ask again (see
+// `lastAssistantWasFacetOverride` in loadHistory). Without this, a user whose search keeps
+// landing above FACET_ASK_THRESHOLD — even after narrowing, even after explicitly saying
+// "just show me the list" — got asked the same question forever with no way out, since the
+// override runs before the model ever sees what the user actually said this turn.
+const FACET_OVERRIDE_MARKER = "facet_narrow_override";
 
 /**
- * gpt-4o-mini reliably ignores the "more than 8 matches: ask one clarifying question,
+ * gpt-4o-mini reliably ignores the "more than N matches: ask one clarifying question,
  * don't list them" instruction in modes.ts's RESULT_COUNT_HANDLING — verified by direct
  * testing, it dumps a raw numbered list of SKUs regardless of the prompt wording. With no
  * deterministic UI card anymore (removed in favor of fully conversational text, per
  * product decision), that overwhelming dump is now the entire user-facing result, so this
  * one case is composed server-side instead of trusted to the model — still plain
- * conversational text, just reliably correct instead of a coin flip.
+ * conversational text, just reliably correct instead of a coin flip. Fires at most once
+ * per narrowing chain (see FACET_OVERRIDE_MARKER) so it can never trap the user in a loop.
  */
 function buildFacetClarifyingQuestion(
   total: number,
@@ -58,16 +70,26 @@ interface AccumulatedToolCall {
   args: string;
 }
 
-async function loadHistory(sessionId: string): Promise<ChatCompletionMessageParam[]> {
+async function loadHistory(sessionId: string): Promise<{
+  messages: ChatCompletionMessageParam[];
+  lastAssistantWasFacetOverride: boolean;
+}> {
   const rows = await prisma.chatMessage.findMany({
     where: { sessionId },
     orderBy: { createdAt: "desc" },
     take: HISTORY_TURNS,
   });
-  return rows
-    .reverse()
-    .filter((m) => m.content)
-    .map((m) => ({ role: m.role, content: m.content! }) as ChatCompletionMessageParam);
+  // rows is newest-first here, so the first assistant row found is the most recent one.
+  const lastAssistant = rows.find((m) => m.role === "assistant");
+
+  return {
+    messages: rows
+      .slice()
+      .reverse()
+      .filter((m) => m.content)
+      .map((m) => ({ role: m.role, content: m.content! }) as ChatCompletionMessageParam),
+    lastAssistantWasFacetOverride: lastAssistant?.toolName === FACET_OVERRIDE_MARKER,
+  };
 }
 
 /**
@@ -82,7 +104,7 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
 
   await prisma.chatMessage.create({ data: { sessionId, role: "user", content: userMessage } });
 
-  const history = await loadHistory(sessionId);
+  const { messages: history, lastAssistantWasFacetOverride } = await loadHistory(sessionId);
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: buildSystemPrompt(wpIdentity, mode) },
     ...history,
@@ -93,6 +115,7 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
   const toolContext: ToolContext = { sessionId, wpIdentity, mode };
   const collectedActionCards: ActionCard[] = [];
   let finalContent = "";
+  let firedFacetOverride = false;
 
   for (let roundTrip = 0; roundTrip <= MAX_TOOL_ROUNDTRIPS; roundTrip++) {
     let stream;
@@ -170,12 +193,13 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
         ok &&
         tc.name === "search_products" &&
         !overwhelmingResultText &&
+        !lastAssistantWasFacetOverride &&
         PRODUCT_SEARCH_MODES.includes(mode) &&
         typeof resultPayload === "object" &&
         resultPayload !== null
       ) {
         const result = resultPayload as { total?: unknown; facets?: ProductFacets };
-        if (typeof result.total === "number" && result.total > PRODUCT_LIST_MAX && result.facets) {
+        if (typeof result.total === "number" && result.total > FACET_ASK_THRESHOLD && result.facets) {
           let appliedArgs: { category?: unknown; brand?: unknown } = {};
           try {
             appliedArgs = JSON.parse(tc.args || "{}");
@@ -193,6 +217,7 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
     if (overwhelmingResultText) {
       yield { type: "token", delta: overwhelmingResultText };
       finalContent = overwhelmingResultText;
+      firedFacetOverride = true;
       break;
     }
   }
@@ -203,6 +228,7 @@ export async function* runChatTurn(params: RunTurnParams): AsyncGenerator<Stream
       role: "assistant",
       content: finalContent || null,
       actionCards: collectedActionCards.length ? (collectedActionCards as any) : undefined,
+      toolName: firedFacetOverride ? FACET_OVERRIDE_MARKER : undefined,
     },
   });
 
